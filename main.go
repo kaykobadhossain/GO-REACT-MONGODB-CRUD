@@ -8,12 +8,14 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Todo struct {
-	ID        int    `json:"_id" bson:"_id"`
+	ID        primitive.ObjectID    `json:"_id,omitempty" bson:"_id,omitempty"`
 	Completed bool   `json:"completed"`
 	Body      string `json:"body"`
 }
@@ -35,6 +37,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer client.Disconnect(context.Background())
 	err = client.Ping(context.Background(), nil)
 
 	if err != nil {
@@ -57,11 +60,40 @@ func main() {
 }
 
 func getAllTodos(c *fiber.Ctx) error {
-	return c.Status(200).JSON(fiber.Map{"msg": "All todo List"})
+
+	var todos []Todo
+	cursor , err := collection.Find(context.Background(),bson.M{})
+
+	if err!=nil{
+		return err;
+	}
+
+	defer cursor.Close(context.Background())
+
+	for cursor.Next(context.Background()){
+		var todo Todo
+		if err := cursor.Decode(&todo); err != nil{
+			return err
+		}
+		todos = append(todos, todo)
+	}
+	return c.JSON(todos)
 }
 
 func createATodo(c *fiber.Ctx) error {
-	return c.Status(200).JSON(fiber.Map{"msg": "create A Todo"})
+	todo := new(Todo)
+	if err:=c.BodyParser(todo); err !=nil{
+		return err;
+	}
+	if todo.Body ==""{
+		return c.Status(400).JSON(fiber.Map{"error": "Todo can not be empty"})
+	}
+	insertResult ,err := collection.InsertOne(context.Background(),todo)
+	if err!= nil{
+		return err;
+	}
+	todo.ID = insertResult.InsertedID.(primitive.ObjectID)
+	return c.Status(201).JSON(todo)
 }
 func updateATodo(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{"msg": "update a todo"})
