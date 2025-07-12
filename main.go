@@ -15,9 +15,9 @@ import (
 )
 
 type Todo struct {
-	ID        primitive.ObjectID    `json:"_id,omitempty" bson:"_id,omitempty"`
-	Completed bool   `json:"completed"`
-	Body      string `json:"body"`
+	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	Completed bool               `json:"completed"`
+	Body      string             `json:"body"`
 }
 
 var collection *mongo.Collection
@@ -62,17 +62,17 @@ func main() {
 func getAllTodos(c *fiber.Ctx) error {
 
 	var todos []Todo
-	cursor , err := collection.Find(context.Background(),bson.M{})
+	cursor, err := collection.Find(context.Background(), bson.M{})
 
-	if err!=nil{
-		return err;
+	if err != nil {
+		return err
 	}
 
 	defer cursor.Close(context.Background())
 
-	for cursor.Next(context.Background()){
+	for cursor.Next(context.Background()) {
 		var todo Todo
-		if err := cursor.Decode(&todo); err != nil{
+		if err := cursor.Decode(&todo); err != nil {
 			return err
 		}
 		todos = append(todos, todo)
@@ -82,21 +82,32 @@ func getAllTodos(c *fiber.Ctx) error {
 
 func createATodo(c *fiber.Ctx) error {
 	todo := new(Todo)
-	if err:=c.BodyParser(todo); err !=nil{
-		return err;
+	if err := c.BodyParser(todo); err != nil {
+		return err
 	}
-	if todo.Body ==""{
+	if todo.Body == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "Todo can not be empty"})
 	}
-	insertResult ,err := collection.InsertOne(context.Background(),todo)
-	if err!= nil{
-		return err;
+	insertResult, err := collection.InsertOne(context.Background(), todo)
+	if err != nil {
+		return err
 	}
 	todo.ID = insertResult.InsertedID.(primitive.ObjectID)
 	return c.Status(201).JSON(todo)
 }
 func updateATodo(c *fiber.Ctx) error {
-	return c.Status(200).JSON(fiber.Map{"msg": "update a todo"})
+	id := c.Params("id")
+	objectId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	filter := bson.M{"_id": objectId}
+	update := bson.M{"$set": bson.M{"completed": true}}
+	_, err = collection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return err
+	}
+	return c.Status(200).JSON(fiber.Map{"msg": "successfully updated a todo"})
 }
 func deleteATodo(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{"msg": "delete a todo"})
